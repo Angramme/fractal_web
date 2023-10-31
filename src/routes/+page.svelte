@@ -17,6 +17,10 @@
     const shaders = [vert_sh, frag_sh].map(f=>preprocess(f, dynamic_params));
     const parameters = Promise.all(shaders).then(v=>v.flatMap(s=>s[1]));
 
+    let material_handle: THREE.ShaderMaterial;
+    $: uniform_handles = material_handle?.uniforms;
+    $: define_handle = material_handle?.defines;
+
     onMount(()=>{
         const cleanup: { (): any }[] = [];
         const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
@@ -27,14 +31,13 @@
         })
         renderer.setPixelRatio(pixel_ratio*window.devicePixelRatio);
         let scene: THREE.Scene;
-        let uniform_handles: {[uniform: string]: THREE.IUniform<any>;} = {};
 
         const onresize = ()=>{
             renderer.setSize(window.innerWidth, window.innerHeight);
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             controls.update();
-            if(uniform_handles.screen_ratio)
+            if(uniform_handles?.screen_ratio)
                 uniform_handles.screen_ratio.value = window.innerHeight/window.innerWidth;
         };
         onresize();
@@ -44,10 +47,10 @@
         (async ()=>{
             const [vert, frag] = (await Promise.all(shaders)).map(v=>v[0]);
 
-            [scene, uniform_handles] = setup_scene(vert, frag, await parameters);
+            [scene, material_handle] = setup_scene(vert, frag, await parameters);
             onresize();
             for(let pa of await parameters){
-                pa.attachUniform(uniform_handles[pa.name]);
+                pa.attachMaterial(material_handle);
             }
         })();
 

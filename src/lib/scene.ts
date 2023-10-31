@@ -1,7 +1,8 @@
 import * as THREE from "three"
 import type { Parameter } from "./preprocess";
 
-export default function scene_setup(vert: string, frag: string, params: Parameter[]): [THREE.Scene, {[uniform: string]: THREE.IUniform<any>;}] {
+export default function scene_setup(vert: string, frag: string, params: Parameter[]): 
+    [THREE.Scene, THREE.ShaderMaterial] {
     const scene = new THREE.Scene();
 
     const uniforms = {
@@ -11,8 +12,18 @@ export default function scene_setup(vert: string, frag: string, params: Paramete
         screen_ratio: { value: window.innerHeight/window.innerWidth },
         
         ...Object.assign({}, ...params
-            .map(p=>({[p.name]: { value: p.default }}))),
+            .filter(d=>d.dynamic)
+            .map(p=>({[p.name]: { value: p.value }}))),
     };
+
+    const value_str = (val: number, type: string)=>{
+        if(type == "float") return val.toFixed(20);
+        if(type == "int") return `${val | 0}`;
+        else{
+            console.warn("bad type "+type);
+            return `${val}`;
+        }
+    }
 
     const material = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3,
@@ -23,7 +34,11 @@ export default function scene_setup(vert: string, frag: string, params: Paramete
         depthTest: false,
         transparent: true,
 
-        uniforms
+        uniforms,
+
+        defines: Object.assign({}, ...params
+            .filter(d=>!d.dynamic)
+            .map(p=>({[p.name]: value_str(p.value, p.type) }))),
     });
     const quad = new THREE.Mesh(
         new THREE.PlaneGeometry(2, 2),
@@ -31,5 +46,5 @@ export default function scene_setup(vert: string, frag: string, params: Paramete
     );
     scene.add(quad);
 
-    return [scene, material.uniforms];
+    return [scene, material];
 }

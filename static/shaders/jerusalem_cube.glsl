@@ -6,7 +6,7 @@ float sdBox( vec3 p, vec3 b )
 
 // #define vB 0.38
 // #define vB 0.42
-parameter float cube_ratio = 0.4 [0.1, 1.0];
+parameter static float cube_ratio = 0.4 [0.1, 1.0];
 
 #define vB cube_ratio
 // #define vB (2.0/5.)
@@ -16,6 +16,7 @@ parameter float cube_ratio = 0.4 [0.1, 1.0];
     float S = 2.;
     P *= .5;
 
+    #pragma unroll_loop_start
     for(int i=0; i<N; i++){
         // reduce the problem to one single symmetry
         P = abs(P);
@@ -36,6 +37,7 @@ parameter float cube_ratio = 0.4 [0.1, 1.0];
             S *= vA;
         }
     }
+    #pragma unroll_loop_end
 
     // calcule the cube distance...
     float cube = sdBox(P, vec3(.5))*S;
