@@ -90,9 +90,9 @@ export function parameters(shader: string, default_dynamic: boolean): [string, P
     return [shad, params];
 }
 
-export async function preprocess(shader_raw: string, default_dynamic: boolean, special_files: {[k:string]:string} = {}) {
-    // const query = (shd: string)=>import(`$lib/shader/${shd}?raw`)
-    const prequery = (shd: string)=>special_files[shd] || shd;
-    const query = (shd: string)=>browser ? fetch(`/shaders/${prequery(shd)}`).then(v=>v.text()) : new Promise(r=>r(""));
+export async function preprocess(shader_raw: string, default_dynamic: boolean, special_files: {[k:string]:Promise<string>} = {}) {
+    const query = (shd: string)=>special_files[shd] || new Promise(r=>r(""));
+    // const prequery = (shd: string)=>special_files[shd] || null;
+    // const query = (shd: string)=>prequery(shd) || (browser ? fetch(`/shaders/${shd}`).then(v=>v.text()) : new Promise(r=>r("")));
     return parameters(await includes(shader_raw, query), true);
 }

@@ -7,18 +7,25 @@
     import { Parameter, preprocess } from '$lib/preprocess';
     import setup_scene from "$lib/scene"
     import { browser } from '$app/environment';
-    
-    export let data;
 
+    const get_filename = (path: string)=>path.replace(/^.*[\\\/]/, '');
+    const fractal_modules = 
+        Object.fromEntries(
+            Object.entries(
+                import.meta.glob('$lib/fractals/*.glsl', { as: 'raw', eager: false }))
+            .map(([key, val])=>[get_filename(key), val]));
+    const fractals = Object.keys(fractal_modules);
+
+    
     let show_gui = true;
     let canvas: HTMLCanvasElement;
     let pixel_ratio = 0.3;
     let renderer: THREE.WebGLRenderer;
     $: renderer && renderer.setPixelRatio(pixel_ratio*window.devicePixelRatio);
-
+    
     const dynamic_params = true;
     let fractal = "jerusalem_cube.glsl";
-    $: shaders = [vert_sh, frag_sh].map(f=>preprocess(f, dynamic_params, {"__fractal.glsl": fractal}));
+    $: shaders = [vert_sh, frag_sh].map(f=>preprocess(f, dynamic_params, {"__fractal.glsl": fractal_modules[fractal]()}));
     let parameters: Promise<Parameter[]>;
     $: shaders && (()=>parameters = Promise.all(shaders).then(v=>v.flatMap(s=>s[1])))();
     // $: parameters = Promise.all(shaders).then(v=>v.flatMap(s=>s[1]));
@@ -107,16 +114,13 @@
     <button on:click={()=>show_gui=!show_gui}>{show_gui ? "hide" : "show"} GUI</button>
     <hr/>
     {#if show_gui}
-        {#await data.streamed.fractals}
-            Loading fractal files
-        {:then fractals}
-            <h5>fractal :</h5>
-            <select id="cars" bind:value={fractal}>
-                {#each fractals as F}
-                    <option value={F}>{F.split(".")[0]}</option>                
-                {/each}
-            </select>
-        {/await}
+        
+        <h5>fractal :</h5>
+        <select id="cars" bind:value={fractal}>
+            {#each fractals as F}
+                <option value={F}>{F.split(".")[0].replace("_", " ")}</option>                
+            {/each}
+        </select>
         <h5>resolution :</h5>
         <input type="range" step="0.01" min="0" max="1" bind:value={pixel_ratio}/>
         {#await parameters}

@@ -17,7 +17,11 @@ parameter static float cube_ratio = 0.4 [0., 1.0];
     float S = 2.;
     P *= .5;
 
-    
+    // vec3 color = mix(vec3(1, 0.5, 0.5), vec3(0.5, 0.5, 1), cos(1.6+P.y*30.)*0.5+0.5);
+
+    // vec3 color = vec3(1, 0.5, 0.5);
+    // if(P.y < 0.) color = vec3(0.5, 0.5, 1);
+
     #pragma unroll_loop_start
     for(int i=0; i<iterations; i++){
         // reduce the problem to one single symmetry
@@ -45,4 +49,5 @@ parameter static float cube_ratio = 0.4 [0., 1.0];
     float cube = sdBox(P, vec3(.5))*S;
 
     return vec4(cube, vec3(1, 1, .5));
+    // return vec4(cube, color);
 }
