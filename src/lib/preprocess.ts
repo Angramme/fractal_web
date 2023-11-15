@@ -1,3 +1,4 @@
+import { browser } from "$app/environment";
 import type { IUniform } from "three";
 
 export class Parameter{
@@ -22,7 +23,11 @@ export class Parameter{
     get span(){
         return this.max - this.min;
     }
+    get step(){
+        return this.type == "int" ? 1 : this.span/1000;
+    }
     set value(val: any){
+        if(this.type == 'float' && parseInt(val) == parseFloat(val)) val = val + ".0";
         if(!this._material) return;
         if(!this.dynamic){
             this._material.needsUpdate = true;
@@ -32,12 +37,25 @@ export class Parameter{
         }
     }
     get value(){
+        return this._normalize(this._value);
+    }
+    get _value(){
         if(!this._material) return this.default;
         if(!this.dynamic){
             return this._material.defines[this.name];
         }else{
             return this._material.uniforms[this.name].value;
         }
+    }
+    _normalize(val: any){
+        val = Math.max(this.min, Math.min(this.max, val));
+        if(this.type == 'int')
+            return parseInt(val);
+            // return (this.step * ((val-this.min)/this.step|0)) + this.min;
+        else if(this.type == 'float')
+            return parseFloat(val);
+        else 
+            return console.error("bad type inside parameter " + this.type);
     }
 }
 
@@ -72,8 +90,9 @@ export function parameters(shader: string, default_dynamic: boolean): [string, P
     return [shad, params];
 }
 
-export async function preprocess(shader_raw: string, default_dynamic: boolean) {
+export async function preprocess(shader_raw: string, default_dynamic: boolean, special_files: {[k:string]:string} = {}) {
     // const query = (shd: string)=>import(`$lib/shader/${shd}?raw`)
-    const query = (shd: string)=>fetch(`/shaders/${shd}`).then(v=>v.text())
+    const prequery = (shd: string)=>special_files[shd] || shd;
+    const query = (shd: string)=>browser ? fetch(`/shaders/${prequery(shd)}`).then(v=>v.text()) : new Promise(r=>r(""));
     return parameters(await includes(shader_raw, query), true);
 }

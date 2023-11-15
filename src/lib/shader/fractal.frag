@@ -1,6 +1,6 @@
 
 #ifdef GL_ES
-precision mediump float;
+precision highp float;
 precision mediump int;
 #endif
 
@@ -9,10 +9,10 @@ uniform mat4 cam_direction;
 uniform vec3 light_direction;
 uniform float screen_ratio;
 
-parameter static int iterations = 1 [1, 10];
 parameter static int reflection_bounces = 2 [1, 10];
 
-parameter dynamic float cut_position = -2 [-1, 1];
+parameter dynamic float cut_position = -2 [-1.5, 1.5];
+parameter static float roundness = 0.00001 [0.00001, 0.1];
 // uniform vec3 cut_direction;
 
 // in vec4 vertTexCoord;
@@ -26,14 +26,14 @@ out vec4 fragColor;
 #define EPS .00002
 
 //this is going to paste in the fractal distance function
-#import "jerusalem_cube.glsl" as fractalSDF
+#import "__fractal.glsl" as fractalSDF
 
 struct PData{
     float D;
     vec3 COL;
 };
 PData map(vec3 P){
-    vec4 fractal = fractalSDF(P, iterations);
+    vec4 fractal = fractalSDF(P) - roundness;
 
     // return PData(fractal.x, fractal.yzw);
 

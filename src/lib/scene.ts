@@ -7,13 +7,13 @@ export default function scene_setup(vert: string, frag: string, params: Paramete
 
     const uniforms = {
         time: { value: 1.0 },
-        light_direction: { value: new THREE.Vector3(1, 0, 0), },
+        light_direction: { value: new THREE.Vector3(1.2, 1, 0.5).normalize(), },
         cam_direction: { value: new THREE.Matrix4() },
         screen_ratio: { value: window.innerHeight/window.innerWidth },
         
-        ...Object.assign({}, ...params
+        ...Object.fromEntries(params
             .filter(d=>d.dynamic)
-            .map(p=>({[p.name]: { value: p.value }}))),
+            .map(p=>[p.name, { value: p.value }])),
     };
 
     const value_str = (val: number, type: string)=>{

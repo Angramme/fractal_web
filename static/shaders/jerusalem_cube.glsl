@@ -6,18 +6,20 @@ float sdBox( vec3 p, vec3 b )
 
 // #define vB 0.38
 // #define vB 0.42
-parameter static float cube_ratio = 0.4 [0.1, 1.0];
+parameter static int iterations = 2 [0, 20];
+parameter static float cube_ratio = 0.4 [0., 1.0];
 
 #define vB cube_ratio
 // #define vB (2.0/5.)
 #define vA (1.-2.*vB)
 
-#export vec4 IFS(vec3 P, int N){
+#export vec4 IFS(vec3 P){
     float S = 2.;
     P *= .5;
 
+    
     #pragma unroll_loop_start
-    for(int i=0; i<N; i++){
+    for(int i=0; i<iterations; i++){
         // reduce the problem to one single symmetry
         P = abs(P);
         if(P.x < P.z) P.xz = P.zx;

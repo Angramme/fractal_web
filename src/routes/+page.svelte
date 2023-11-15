@@ -4,57 +4,69 @@
     import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
     import vert_sh from "$lib/shader/fractal.vert?raw";
     import frag_sh from "$lib/shader/fractal.frag?raw";
-    import { preprocess } from '$lib/preprocess';
+    import { Parameter, preprocess } from '$lib/preprocess';
     import setup_scene from "$lib/scene"
+    import { browser } from '$app/environment';
+    
+    export let data;
 
+    let show_gui = true;
     let canvas: HTMLCanvasElement;
-    let pixel_ratio = 0.1;
+    let pixel_ratio = 0.3;
     let renderer: THREE.WebGLRenderer;
-    // let parameters: Parameter[];
     $: renderer && renderer.setPixelRatio(pixel_ratio*window.devicePixelRatio);
 
     const dynamic_params = true;
-    const shaders = [vert_sh, frag_sh].map(f=>preprocess(f, dynamic_params));
-    const parameters = Promise.all(shaders).then(v=>v.flatMap(s=>s[1]));
+    let fractal = "jerusalem_cube.glsl";
+    $: shaders = [vert_sh, frag_sh].map(f=>preprocess(f, dynamic_params, {"__fractal.glsl": fractal}));
+    let parameters: Promise<Parameter[]>;
+    $: shaders && (()=>parameters = Promise.all(shaders).then(v=>v.flatMap(s=>s[1])))();
+    // $: parameters = Promise.all(shaders).then(v=>v.flatMap(s=>s[1]));
 
     let material_handle: THREE.ShaderMaterial;
     $: uniform_handles = material_handle?.uniforms;
     $: define_handle = material_handle?.defines;
 
+    let camera: THREE.PerspectiveCamera;
+    let controls: OrbitControls;
+    let scene: THREE.Scene;
+
+    const onresize = ()=>{
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        controls.update();
+        if(uniform_handles?.screen_ratio)
+            uniform_handles.screen_ratio.value = window.innerHeight/window.innerWidth;
+    };
+    const update_scene = async ()=>{
+        const [vert, frag] = (await Promise.all(shaders)).map(v=>v[0]);
+
+        [scene, material_handle] = setup_scene(vert, frag, await parameters);
+        onresize();
+        for(let pa of await parameters){
+            pa.attachMaterial(material_handle);
+        }
+    };
+    $: fractal && browser && update_scene();
+
     onMount(()=>{
         const cleanup: { (): any }[] = [];
-        const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-        const controls = new OrbitControls( camera, canvas );
+        camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+        controls = new OrbitControls( camera, canvas );
         renderer = new THREE.WebGLRenderer({
             canvas,
             antialias: true,
         })
         renderer.setPixelRatio(pixel_ratio*window.devicePixelRatio);
-        let scene: THREE.Scene;
-
-        const onresize = ()=>{
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            controls.update();
-            if(uniform_handles?.screen_ratio)
-                uniform_handles.screen_ratio.value = window.innerHeight/window.innerWidth;
-        };
+        
         onresize();
         window.addEventListener("resize", onresize);
         cleanup.push(()=>window.removeEventListener("resize", onresize));
 
-        (async ()=>{
-            const [vert, frag] = (await Promise.all(shaders)).map(v=>v[0]);
+        update_scene();
 
-            [scene, material_handle] = setup_scene(vert, frag, await parameters);
-            onresize();
-            for(let pa of await parameters){
-                pa.attachMaterial(material_handle);
-            }
-        })();
-
-        camera.position.setZ(-20);
+        camera.position.set(6, 5, 9);
         // const rotation_mat = new THREE.Matrix4();
 
         let fps = 60;
@@ -92,16 +104,40 @@
 <canvas bind:this={canvas}></canvas>
 
 <div class="gui">
-    <h5>resolution :</h5>
-    <input type="range" step="0.01" min="0" max="1" bind:value={pixel_ratio}/>
-    {#await parameters}
-        Loading parameters...
-    {:then params} 
-        {#each params as p}
-            <h5>{p.name} :</h5>
-            <input type="range" step={p.type == "int" ? 1 : p.span/1000} min={p.min} max={p.max} bind:value={p.value}/>
-        {/each}
-    {/await}
+    <button on:click={()=>show_gui=!show_gui}>{show_gui ? "hide" : "show"} GUI</button>
+    <hr/>
+    {#if show_gui}
+        {#await data.streamed.fractals}
+            Loading fractal files
+        {:then fractals}
+            <h5>fractal :</h5>
+            <select id="cars" bind:value={fractal}>
+                {#each fractals as F}
+                    <option value={F}>{F.split(".")[0]}</option>                
+                {/each}
+            </select>
+        {/await}
+        <h5>resolution :</h5>
+        <input type="range" step="0.01" min="0" max="1" bind:value={pixel_ratio}/>
+        {#await parameters}
+            Loading parameters...
+        {:then params} 
+            {#each params as p}
+                <!-- <h5>{p.name} [{p.value}] :</h5> -->
+                <h5>{p.name} [{p.value}] :</h5>
+                <span>{p.min}</span>
+                <input type="range" step={p.step} min={p.min} max={p.max} value={p.value} on:input={({target})=>p.value = (target?.value)}/>
+                <span>{p.max}</span>
+            {/each}
+        {:catch error}
+            <h1>There was an error loading the shader</h1>
+            <p>
+                {error}
+            </p>
+        {/await}
+    {:else}
+        gui hidden
+    {/if}
 </div>
 
 <style>
@@ -120,5 +156,8 @@
         position: fixed;
         top: 0;
         right: 0;
+    }
+    .gui > h5{
+        margin: 0.8rem 0 0.1rem 0;
     }
 </style>
