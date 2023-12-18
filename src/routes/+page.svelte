@@ -34,7 +34,7 @@
     $: uniform_handles = material_handle?.uniforms;
     $: define_handle = material_handle?.defines;
 
-    let camera: THREE.PerspectiveCamera;
+    let camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera( 75, 1., 0.1, 1000 );
     let controls: OrbitControls;
     let scene: THREE.Scene;
 
@@ -59,7 +59,6 @@
 
     onMount(()=>{
         const cleanup: { (): any }[] = [];
-        camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
         controls = new OrbitControls( camera, canvas );
         renderer = new THREE.WebGLRenderer({
             canvas,

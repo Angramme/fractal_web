@@ -6,14 +6,15 @@ float sdBox( vec3 p, vec3 b )
 
 // #define vB 0.38
 // #define vB 0.42
-parameter static int iterations = 2 [0, 20];
+// parameter static int iterations = 2 [0, 20];
 parameter static float cube_ratio = 0.4 [0., 1.0];
 
+#define MAX_ITER_JER 30
 #define vB cube_ratio
 // #define vB (2.0/5.)
 #define vA (1.-2.*vB)
 
-#export vec4 IFS(vec3 P){
+#export vec4 IFS(vec3 P, float min_detail){
     float S = 2.;
     P *= .5;
 
@@ -22,8 +23,10 @@ parameter static float cube_ratio = 0.4 [0., 1.0];
     // vec3 color = vec3(1, 0.5, 0.5);
     // if(P.y < 0.) color = vec3(0.5, 0.5, 1);
 
-    #pragma unroll_loop_start
-    for(int i=0; i<iterations; i++){
+    for(int i=0; i<MAX_ITER_JER; i++){
+        // break if we reached the desired LOD
+        if(S <= 2.*min_detail) break;
+        
         // reduce the problem to one single symmetry
         P = abs(P);
         if(P.x < P.z) P.xz = P.zx;
@@ -42,8 +45,8 @@ parameter static float cube_ratio = 0.4 [0., 1.0];
             P *= 1./vA;
             S *= vA;
         }
+
     }
-    #pragma unroll_loop_end
 
     // calcule the cube distance...
     float cube = sdBox(P, vec3(.5))*S;

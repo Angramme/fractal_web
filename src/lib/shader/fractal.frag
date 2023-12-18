@@ -12,7 +12,8 @@ uniform float screen_ratio;
 parameter static int reflection_bounces = 2 [1, 10];
 
 parameter dynamic float cut_position = -2 [-1.5, 1.5];
-parameter static float roundness = 0.00001 [0.00001, 0.1];
+parameter static float roundness = 0.0 [0.0, 0.1];
+parameter static float LOD = 150. [0, 2000.];
 // uniform vec3 cut_direction;
 
 // parameter static int global_illumination_iterations = 1 [0, 1];
@@ -23,10 +24,11 @@ in vec2 vUv;
 out vec4 fragColor;
 
 #define PI 3.14159265359
-#define MAX_ITER 200
+#define MAX_ITER_MARCH 200
+#define MIN_DETAIL_MAP 0.0001
 #define MIN_DIST .00001
 #define MAX_DIST 500.
-#define EPS .00002
+#define EPS .00001
 
 /*
     static.frag
@@ -74,8 +76,8 @@ struct PData{
     float D;
     vec3 COL;
 };
-PData map(vec3 P){
-    vec4 fractal = fractalSDF(P) - roundness;
+PData map(vec3 P, float min_detail){
+    vec4 fractal = fractalSDF(P, min_detail) - roundness;
 
     // return PData(fractal.x, fractal.yzw);
 
@@ -88,33 +90,44 @@ PData map(vec3 P){
 }
 
 struct MData{
-    float D;
-    float mn;
-    vec3 COL;
+    float D; // distance travelled
+    float min_detail; // mininum detail size
+    float mn; // min distance
+    vec3 COL; // color
 };
 MData march(vec3 O, vec3 D){
     float t = 0.;
     float mn = MAX_DIST;
     PData d;
 
-    #pragma unroll_loop_start
-    for(int i=0; i<MAX_ITER; i++){
-        d = map(O + t*D);
+    float min_detail = MIN_DETAIL_MAP;
+    float lod_count = 1.;
+
+    // #pragma chunk_loop_start 50
+    for(int i=0; i<MAX_ITER_MARCH; i++){
+        d = map(O + t*D, min_detail);
         t += d.D;
+        // ite = LOD*log(C2/t);
+        //iter = min(MAX_ITER_MAP, int(ite));
         mn = min(mn, d.D);
+
+        lod_count += 1.;
+        float div = 1./(lod_count+1.);
+        min_detail = div*lod_count* min_detail + div* t/LOD;
+        
         if(t > MAX_DIST) break;
         if(d.D < MIN_DIST) break; 
     }
-    #pragma unroll_loop_end
+    // #pragma chunk_loop_end
 
-    return MData(t, mn, d.COL);
+    return MData(t, min_detail, mn, d.COL);
 }
 
-float softshadow(in vec3 ro, in vec3 rd, float mint, float maxt, float k ){
+float softshadow(in vec3 ro, in vec3 rd, float mint, float maxt, float k, float min_detail){
     float res = 1.0;
     #pragma unroll_loop_start
     for( float t=mint; t<maxt; ){
-        float h = map(ro + rd*t).D;
+        float h = map(ro + rd*t, min_detail).D;
         if( h<MIN_DIST ) return 0.0;
         res = min( res, k*h/t );
         t += h;
@@ -122,12 +135,12 @@ float softshadow(in vec3 ro, in vec3 rd, float mint, float maxt, float k ){
     #pragma unroll_loop_end
     return res;
 }
-float softshadow2( in vec3 ro, in vec3 rd, float mint, float maxt, float k ){
+float softshadow2( in vec3 ro, in vec3 rd, float mint, float maxt, float k, float min_detail){
     float res = 1.0;
     float ph = 1e20;
     #pragma unroll_loop_start
     for( float t=mint; t<maxt; ){
-        float h = map(ro + rd*t).D;
+        float h = map(ro + rd*t, min_detail).D;
         if( h<MIN_DIST ) return 0.0;
         float y = h*h/(2.0*ph);
         float d = sqrt(h*h-y*y);
@@ -139,11 +152,14 @@ float softshadow2( in vec3 ro, in vec3 rd, float mint, float maxt, float k ){
     return res;
 }
 
-vec3 normal(vec3 p){
+vec3 normal(vec3 p, float min_detail){
     const vec2 X = vec2(EPS, 0); 
+    // maybe change this
     return (vec3(
-        map(p + X.xyy).D, map(p + X.yxy).D, map(p + X.yyx).D
-    )-vec3(map(p).D))/EPS;
+        map(p + X.xyy, min_detail).D, 
+        map(p + X.yxy, min_detail).D, 
+        map(p + X.yyx, min_detail).D
+    )-vec3(map(p, min_detail).D))/EPS;
 }
 
 void main() {
@@ -162,12 +178,12 @@ void main() {
 
     vec3 color_accumulator = vec3(1);
     #pragma unroll_loop_start
-    for(int B=0; B<reflection_bounces; B++){
+    for(int i=0; i<reflection_bounces; i++){
         MData mp = march(ro, rd);
         vec3 P = ro + rd * mp.D;
         //vec3 N = mp.N; 
-        vec3 N = normal(P);
-        float sh = softshadow2(P + (MIN_DIST*3.)*N, SUN, 0., 50., 6.);
+        vec3 N = normal(P, mp.min_detail);
+        float sh = softshadow2(P + (MIN_DIST*3.)*N, SUN, 0., 50., 6., mp.min_detail);
         
         float diffuse = max(0., dot(N, SUN));
         float specular = pow(clamp(dot(reflect(-SUN, N), -rd), 0., 1.), 8.);

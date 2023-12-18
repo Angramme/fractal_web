@@ -1,5 +1,3 @@
-import { browser } from "$app/environment";
-import type { IUniform } from "three";
 
 export class Parameter{
     type: string;
@@ -90,9 +88,27 @@ export function parameters(shader: string, default_dynamic: boolean): [string, P
     return [shad, params];
 }
 
+export function unroll_loops(shader: string): string {
+    const for_re = /#pragma\s+chunk_loop_start\s+([0-9]+)\s+for\s*\(\s*int\s(\S+?)\s*=\s*(\S+?)\s*;\s*(\S+?)\s*<\s*(\S+?)\s*;\s*(?:i\s*\+\+|\+\+\s*i)\s*\)\s*{([\S\s]+?)}\s*#pragma\s+chunk_loop_end/gm;
+
+    shader = shader.replace(for_re, (_mch, chunk_size, i1, begin, i2, end, body: string)=>{
+        if(i1 != i2) console.error("variable name mismatch in for loop unroll");
+        let ret = `for(int ${i1}_A_A_A=${begin}; ${i1}_A_A_A < ${end}; ${i1}_A_A_A += ${chunk_size}){ int ${i1} = 0;`;
+        ret += Array.from({length: chunk_size}).map((_, i)=>`
+            ${i1} = ${i1}_A_A_A + ${i};
+            if(${i1} >= ${end}) break;
+            ${body}`
+            ).join("\n");
+        ret += '}';
+        return ret;
+    })
+
+    return shader;
+}
+
 export async function preprocess(shader_raw: string, default_dynamic: boolean, special_files: {[k:string]:Promise<string>} = {}) {
     const query = (shd: string)=>special_files[shd] || new Promise(r=>r(""));
     // const prequery = (shd: string)=>special_files[shd] || null;
     // const query = (shd: string)=>prequery(shd) || (browser ? fetch(`/shaders/${shd}`).then(v=>v.text()) : new Promise(r=>r("")));
-    return parameters(await includes(shader_raw, query), true);
+    return parameters(unroll_loops(await includes(shader_raw, query)), true);
 }

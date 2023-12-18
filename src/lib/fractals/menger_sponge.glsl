@@ -1,5 +1,5 @@
 
-parameter static int iterations = 2 [0, 20];
+parameter static int max_iterations = 2 [0, 20];
 parameter static float box_round = .15 [0., .5];
 
 
@@ -15,11 +15,14 @@ float truc(float x, float t, float s){
     return x > 0. ? s : -s;
 }
 
-#export vec4 IFS(vec3 p){
+#export vec4 IFS(vec3 p, float min_detail){
     p *= 1.5;
     float s = 1.;
 
-    for(int i=0; i<iterations; i++){
+    #pragma unroll_loop_start
+    for(int i=0; i<max_iterations; i++){
+        if(s < min_detail) break;
+
         vec3 ap = abs(p);
         float mid = min(ap.x, min(ap.y, ap.z));
         vec3 boxP = vec3(
@@ -30,6 +33,7 @@ float truc(float x, float t, float s){
         p = p-boxP;
         s *= 0.33333333333333;
     }
+    #pragma unroll_loop_end
     s *= 3.;
     // vec3 N = round(p/s*(1.001));
     

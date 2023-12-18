@@ -1,5 +1,7 @@
 
-parameter static int iterations = 5 [0, 20];
+
+#define MAX_ITER_KCH 60
+// parameter static int iterations = 5 [0, 20];
 parameter static float X2 = 1.15470053839 [0.5, 2];
 
 const mat2 rot60deg = mat2(cos(PI/3.), -sin(PI/3.), sin(PI/3.), cos(PI/3.));
@@ -23,11 +25,13 @@ float sdPolyhedron(vec3 p){
 }
 
 // https://www.researchgate.net/publication/262600735_The_Koch_curve_in_three_dimensions
-#export vec4 IFS(vec3 p){
+#export vec4 IFS(vec3 p, float min_detail){
     //float s = 1.;
     float s2 = 1.;
 
-    for(int i=0; i<iterations; i++){
+    for(int i=0; i<MAX_ITER_KCH; i++){
+        if(s2 < min_detail) break;
+
         // reduce the size by 2/3
         const float X1 = 2./3.;
         s2 *= X1;
@@ -49,6 +53,7 @@ float sdPolyhedron(vec3 p){
         // offset the triangle to the side
         p.x += 1.;
     } // repeat...
+
 
     // calculate the distance...
     float polyhedron = sdPolyhedron(p)*s2;
